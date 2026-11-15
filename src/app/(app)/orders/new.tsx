@@ -34,6 +34,7 @@ export default function NewOrderScreen() {
     },
   });
   const [quote, setQuote] = useState<Order>();
+  const [step, setStep] = useState(0);
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -106,6 +107,17 @@ export default function NewOrderScreen() {
     } finally {
       setBusy(false);
     }
+  }
+  function canContinue() {
+    if (step === 2) return true;
+    const place = step === 0 ? input.pickup : input.delivery;
+    return Boolean(
+      place.address.trim() &&
+      place.city.trim() &&
+      place.state.trim() &&
+      place.contact.name.trim() &&
+      place.contact.phone.trim(),
+    );
   }
   async function pay() {
     if (!accessToken || !quote) return;
@@ -187,22 +199,67 @@ export default function NewOrderScreen() {
         </View>
       ) : (
         <View className="gap-4">
-          {address('pickup', 'Pickup details')}
-          {address('delivery', 'Delivery details')}
           <Card>
-            <Text className="mb-4 text-lg font-bold text-foreground-light dark:text-foreground-dark">
-              Item information
+            <Text className="text-sm font-semibold text-primary-light dark:text-primary-dark">
+              Step {step + 1} of 3
             </Text>
-            {field('Description', input.parcel.description ?? '', (v) =>
-              setInput({
-                ...input,
-                parcel: { ...input.parcel, description: v },
-              }),
-            )}
-            <Button className="mt-5" loading={busy} onPress={create}>
-              Review quote
-            </Button>
+            <Text className="mt-1 text-xl font-bold text-foreground-light dark:text-foreground-dark">
+              {['Pickup details', 'Delivery details', 'Parcel details'][step]}
+            </Text>
+            <View className="mt-4 flex-row gap-2">
+              {[0, 1, 2].map((item) => (
+                <View
+                  key={item}
+                  className={`h-2 flex-1 rounded-full ${item <= step ? 'bg-primary-light dark:bg-primary-dark' : 'bg-border-light dark:bg-border-dark'}`}
+                />
+              ))}
+            </View>
           </Card>
+          {step === 0 ? address('pickup', 'Where should we pick up?') : null}
+          {step === 1 ? address('delivery', 'Where should we deliver?') : null}
+          {step === 2 ? (
+            <Card>
+              <Text className="mb-4 text-lg font-bold text-foreground-light dark:text-foreground-dark">
+                Item information
+              </Text>
+              {field('Description', input.parcel.description ?? '', (v) =>
+                setInput({
+                  ...input,
+                  parcel: { ...input.parcel, description: v },
+                }),
+              )}
+              <View className="mt-5 flex-row gap-3">
+                <Button
+                  className="flex-1"
+                  variant="secondary"
+                  onPress={() => setStep(1)}
+                >
+                  Back
+                </Button>
+                <Button className="flex-1" loading={busy} onPress={create}>
+                  Review quote
+                </Button>
+              </View>
+            </Card>
+          ) : null}
+          {step < 2 ? (
+            <View className="flex-row gap-3">
+              <Button
+                className="flex-1"
+                variant="secondary"
+                onPress={() => (step === 0 ? router.back() : setStep(step - 1))}
+              >
+                {step === 0 ? 'Cancel' : 'Back'}
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={!canContinue()}
+                onPress={() => setStep(step + 1)}
+              >
+                Continue
+              </Button>
+            </View>
+          ) : null}
         </View>
       )}
     </Screen>

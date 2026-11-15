@@ -7,7 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input, PasswordInput } from '@/components/ui/input';
 import { Alert, Switch, Tabs } from '@/components/ui/controls';
 import { useSession } from '@/providers/session-provider';
-import { walletApi, type Beneficiary, type WalletTransaction } from './api';
+import {
+  walletApi,
+  type Bank,
+  type Beneficiary,
+  type WalletTransaction,
+} from './api';
 
 type Kind = 'transfer' | 'airtime' | 'data' | 'electricity' | 'cable-tv';
 const titles: Record<Kind, string> = {
@@ -26,6 +31,9 @@ export function PaymentScreen() {
   const [account, setAccount] = useState('');
   const [bankCode, setBankCode] = useState('');
   const [bankName, setBankName] = useState('PEPSA');
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [bankSearch, setBankSearch] = useState('');
+  const [choosingBank, setChoosingBank] = useState(false);
   const [accountName, setAccountName] = useState('');
   const [phone, setPhone] = useState('');
   const [provider, setProvider] = useState('');
@@ -93,6 +101,13 @@ export function PaymentScreen() {
         .then(setBeneficiaries)
         .catch(() => setBeneficiaries([]));
   }, [accessToken, transfer]);
+  useEffect(() => {
+    if (!accessToken || !transfer || scope !== 'external') return;
+    void walletApi
+      .banks(accessToken)
+      .then(setBanks)
+      .catch(() => setError('Could not load the bank list. Please retry.'));
+  }, [accessToken, transfer, scope]);
   useEffect(() => {
     if (!accessToken || kind !== 'data' || phone.length !== 11) return;
     void walletApi
@@ -231,15 +246,61 @@ export function PaymentScreen() {
       ) : null}
       <Card className="gap-4">
         {transfer && scope === 'external' ? (
-          <Input
-            accessibilityLabel="Bank code"
-            value={bankCode}
-            onChangeText={(value) => {
-              setBankCode(value);
-              setAccountName('');
-            }}
-            placeholder="Select bank code"
-          />
+          <View className="gap-2">
+            <Text className="font-medium text-foreground-light dark:text-foreground-dark">
+              Bank
+            </Text>
+            <Button
+              variant="secondary"
+              onPress={() => setChoosingBank(!choosingBank)}
+            >
+              {bankCode ? bankName : 'Select a bank'}
+            </Button>
+            {choosingBank ? (
+              <View className="gap-2 rounded-xl border border-border-light p-3 dark:border-border-dark">
+                <Input
+                  accessibilityLabel="Search banks"
+                  value={bankSearch}
+                  onChangeText={setBankSearch}
+                  placeholder="Search bank name"
+                />
+                <ScrollView className="max-h-64" nestedScrollEnabled>
+                  {banks
+                    .map((bank) => ({
+                      code:
+                        bank.attributes?.nipCode ?? bank.code ?? bank.id ?? '',
+                      name: bank.attributes?.name ?? bank.name ?? '',
+                    }))
+                    .filter(
+                      (bank) =>
+                        bank.code &&
+                        bank.name
+                          .toLowerCase()
+                          .includes(bankSearch.toLowerCase()),
+                    )
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((bank) => (
+                      <Pressable
+                        key={`${bank.code}-${bank.name}`}
+                        accessibilityRole="button"
+                        onPress={() => {
+                          setBankCode(bank.code);
+                          setBankName(bank.name);
+                          setAccountName('');
+                          setChoosingBank(false);
+                          setBankSearch('');
+                        }}
+                        className="border-b border-border-light py-3 dark:border-border-dark"
+                      >
+                        <Text className="font-medium text-foreground-light dark:text-foreground-dark">
+                          {bank.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                </ScrollView>
+              </View>
+            ) : null}
+          </View>
         ) : null}
         {transfer ? (
           <>
@@ -367,6 +428,14 @@ export function PaymentScreen() {
           value={pin}
           onChangeText={(v) => setPin(v.replace(/\D/g, ''))}
         />
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(app)/transaction-security')}
+        >
+          <Text className="font-semibold text-primary-light dark:text-primary-dark">
+            Set up your transaction PIN
+          </Text>
+        </Pressable>
         {transfer ? (
           <Switch
             value={save}
