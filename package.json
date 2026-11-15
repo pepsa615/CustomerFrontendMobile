@@ -8,7 +8,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/ui": "~58.0.28",
-    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/api": "1.9.1",
     "@opentelemetry/exporter-trace-otlp-http": "0.208.0",
     "@opentelemetry/resources": "2.12.1",
     "@opentelemetry/sdk-trace-base": "2.12.1",
