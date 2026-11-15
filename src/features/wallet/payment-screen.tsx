@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { Screen } from '@/components/ui/screen';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import {
   walletApi,
   type Bank,
   type Beneficiary,
+  type TransactionReadiness,
   type WalletTransaction,
 } from './api';
 
@@ -44,6 +45,7 @@ export function PaymentScreen() {
   const [save, setSave] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [readiness, setReadiness] = useState<TransactionReadiness | null>(null);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [plans, setPlans] = useState<
     { productId: string; name: string; amount: number }[]
@@ -52,6 +54,19 @@ export function PaymentScreen() {
   const [validationReference, setValidationReference] = useState('');
   const transfer = kind === 'transfer';
   const bill = kind === 'electricity' || kind === 'cable-tv';
+  useEffect(() => {
+    if (!accessToken) return;
+    void walletApi
+      .readiness(accessToken)
+      .then(setReadiness)
+      .catch((cause) =>
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : 'Could not check payment readiness',
+        ),
+      );
+  }, [accessToken]);
   useEffect(() => {
     if (
       !accessToken ||
@@ -192,6 +207,51 @@ export function PaymentScreen() {
       setLoading(false);
     }
   };
+  if (readiness && !readiness.kycComplete) {
+    return (
+      <Screen
+        title="Verify your identity"
+        description="Complete a one-time security check before your first transfer or bill payment."
+      >
+        <Card className="gap-4">
+          <Text className="text-lg font-bold text-foreground-light dark:text-foreground-dark">
+            Unlock secure payments
+          </Text>
+          <Text className="text-muted-light dark:text-muted-dark">
+            We’ll ask for a selfie and your current location. Your information
+            is encrypted and used to protect your account.
+          </Text>
+          <Button onPress={() => router.push('/(app)/kyc' as Href)}>
+            Start verification
+          </Button>
+          <Button variant="ghost" onPress={() => router.back()}>
+            Not now
+          </Button>
+        </Card>
+      </Screen>
+    );
+  }
+  if (readiness && (!readiness.phoneVerified || !readiness.pinSet)) {
+    return (
+      <Screen
+        title="Secure your payments"
+        description="Verify your phone and create a four-digit transaction PIN."
+      >
+        <Card className="gap-4">
+          <Text className="text-muted-light dark:text-muted-dark">
+            Your transaction PIN is separate from your login password and
+            confirms every payment.
+          </Text>
+          <Button onPress={() => router.push('/(app)/transaction-security')}>
+            Set up transaction PIN
+          </Button>
+          <Button variant="ghost" onPress={() => router.back()}>
+            Not now
+          </Button>
+        </Card>
+      </Screen>
+    );
+  }
   return (
     <Screen
       title={titles[kind]}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { router } from 'expo-router';
 import { View } from 'react-native';
 import { Screen } from '@/components/ui/screen';
 import { Input, OtpInput, PasswordInput } from '@/components/ui/input';
@@ -8,7 +9,7 @@ import { apiRequest } from '@/api/client';
 import { useSession } from '@/providers/session-provider';
 export default function TransactionSecurity() {
   const { accessToken, user } = useSession();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(user?.phoneVerified ? 2 : 0);
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [code, setCode] = useState('');
   const [pin, setPin] = useState('');
@@ -35,6 +36,7 @@ export default function TransactionSecurity() {
           body: JSON.stringify({ pin, confirmPin: confirm }),
         });
         setMessage('Transaction security is ready.');
+        setTimeout(() => router.replace('/(app)/(tabs)/wallet'), 700);
       }
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Could not continue');

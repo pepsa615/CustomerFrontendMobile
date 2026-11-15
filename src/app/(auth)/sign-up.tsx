@@ -97,11 +97,6 @@ export default function SignUp() {
           onPress={() => set('gender')('MALE')}
           label="Male"
         />
-        <Radio
-          selected={form.gender === 'OTHER'}
-          onPress={() => set('gender')('OTHER')}
-          label="Other"
-        />
         <PasswordInput
           accessibilityLabel="Password"
           value={form.password}

@@ -17,12 +17,8 @@ export default function LoginScreen() {
     setLoading(true);
     setError('');
     try {
-      const user = await login(identifier, password);
-      router.replace(
-        user.onboardingStatus === 'COMPLETE'
-          ? '/(app)/(tabs)'
-          : '/(auth)/onboarding',
-      );
+      await login(identifier, password);
+      router.replace('/(app)/(tabs)');
     } catch (cause) {
       if (
         cause instanceof ApiError &&

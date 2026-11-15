@@ -27,11 +27,7 @@ export default function EntryScreen() {
 
       await SplashScreen.hideAsync();
       if (accessToken && user) {
-        router.replace(
-          user.onboardingStatus === 'COMPLETE'
-            ? '/(app)/(tabs)'
-            : '/(auth)/onboarding',
-        );
+        router.replace('/(app)/(tabs)');
       } else {
         router.replace(introComplete ? '/(auth)/login' : '/(auth)/intro');
       }

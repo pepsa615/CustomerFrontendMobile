@@ -70,8 +70,8 @@ export default function Onboarding() {
   }
   return (
     <Screen
-      title="Finish identity setup"
-      description="Take a clear selfie and share your current location. PEPSA stores this privately and does not perform facial recognition."
+      title="Verify your identity"
+      description="A one-time security check is required before your first transfer or bill payment. It takes about two minutes."
     >
       <View className="gap-4">
         {error ? <Alert tone="danger">{error}</Alert> : null}
@@ -92,7 +92,7 @@ export default function Onboarding() {
           {location ? 'Location captured' : 'Use current location'}
         </Button>
         <Button disabled={!asset || !location} onPress={submit}>
-          Complete setup
+          Complete verification
         </Button>
       </View>
     </Screen>

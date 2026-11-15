@@ -43,8 +43,16 @@ export type Bank = {
   name?: string;
   attributes?: { nipCode?: string; name?: string };
 };
+export type TransactionReadiness = {
+  kycComplete: boolean;
+  phoneVerified: boolean;
+  pinSet: boolean;
+  transactionReady: boolean;
+};
 export const walletApi = {
   overview: (token: string) => apiRequest<WalletOverview>('/wallet', token),
+  readiness: (token: string) =>
+    apiRequest<TransactionReadiness>('/account/transaction-readiness', token),
   transactions: (token: string, search = '') =>
     apiRequest<{ items: WalletTransaction[]; nextCursor: string | null }>(
       `/wallet/transactions?limit=50${search ? `&search=${encodeURIComponent(search)}` : ''}`,
