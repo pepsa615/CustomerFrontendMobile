@@ -13,6 +13,7 @@ export default function VerifyEmail() {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   async function submit() {
+    const submittedCode = code.replace(/\D/g, '').slice(0, 6);
     try {
       const data = await apiRequest<{
         accessToken: string;
@@ -22,7 +23,7 @@ export default function VerifyEmail() {
         method: 'POST',
         body: JSON.stringify({
           registrationToken: token,
-          code,
+          code: submittedCode,
           sessionTransport: 'token',
           platform: 'ios',
           deviceName: 'PEPSA mobile app',
