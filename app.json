@@ -1,26 +1,27 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "PEPSA Customer",
     "slug": "pepsa-customer",
+    "description": "Book and track deliveries, manage your wallet, pay bills and run your business securely with PEPSA.",
     "version": "1.0.0",
     "runtimeVersion": { "policy": "appVersion" },
     "updates": { "fallbackToCacheTimeout": 0, "checkAutomatically": "ON_LOAD" },
     "orientation": "portrait",
-    "icon": "./assets/images/HDPI.png",
+    "icon": "./assets/images/pepsa-app-icon.png",
     "scheme": "pepsa",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/pepsa-app-icon.png",
       "bundleIdentifier": "com.pepsasolution.pepsacustomer",
       "supportsTablet": false,
-      "infoPlist": { "NSFaceIDUsageDescription": "Allow PEPSA to unlock your saved session with Face ID." }
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Allow PEPSA to unlock your saved session with Face ID."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#9D0208",
-        "foregroundImage": "./assets/images/HDPI.png",
-        "backgroundImage": "./assets/images/HDPI.png",
-        "monochromeImage": "./assets/images/HDPI.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/pepsa-app-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -34,7 +35,7 @@
     },
     "web": {
       "output": "server",
-      "favicon": "./assets/images/HDPI.png"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -54,7 +55,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow PEPSA to record your onboarding location."
+          "locationWhenInUsePermission": "Allow PEPSA to verify your location when you choose to unlock payments."
         }
       ],
       [
@@ -67,11 +68,11 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#FFFFFF",
-          "image": "./assets/images/HDPI.png",
-          "imageWidth": 96,
+          "image": "./assets/images/pepsa-app-icon.png",
+          "imageWidth": 120,
           "dark": {
             "backgroundColor": "#FFFFFF",
-            "image": "./assets/images/HDPI.png"
+            "image": "./assets/images/pepsa-app-icon.png"
           }
         }
       ],

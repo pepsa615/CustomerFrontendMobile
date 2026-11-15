@@ -48,7 +48,9 @@ export default function EntryScreen() {
           resizeMode="contain"
           accessibilityIgnoresInvertColors
         />
-        <Text className="text-3xl font-bold text-[#B00008]">Pepsa</Text>
+        <Text className="text-3xl font-bold tracking-tight text-[#9D0208]">
+          PEPSA
+        </Text>
       </View>
     </View>
   );
