@@ -40,8 +40,14 @@ export function SettingsDetailScreen({ section }: { section: string }) {
   const title =
     {
       personal: 'Personal information',
+      address: 'Address',
+      preferences: 'Preferences',
+      referrals: 'Referrals',
+      security: 'Settings',
       password: 'Change password',
       payment: 'Payment settings',
+      pin: 'Change transaction PIN',
+      'pin-reset': 'Forgot transaction PIN',
       biometrics: 'Biometrics',
       faq: 'FAQ',
       support: 'Customer support',
@@ -139,6 +145,80 @@ export function SettingsDetailScreen({ section }: { section: string }) {
       }
     >
       {message ? <Alert>{message}</Alert> : null}
+      {section === 'security' ? (
+        <Card className="gap-3">
+          <Button
+            variant="secondary"
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/settings/[section]',
+                params: { section: 'password' },
+              } as never)
+            }
+          >
+            Change password
+          </Button>
+          <Button
+            variant="secondary"
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/settings/[section]',
+                params: { section: 'payment' },
+              } as never)
+            }
+          >
+            Payment settings
+          </Button>
+          <Button
+            variant="secondary"
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/settings/[section]',
+                params: { section: 'biometrics' },
+              } as never)
+            }
+          >
+            Biometrics
+          </Button>
+          <Button
+            variant="danger"
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/settings/[section]',
+                params: { section: 'deactivate' },
+              } as never)
+            }
+          >
+            Close account
+          </Button>
+        </Card>
+      ) : null}
+      {section === 'address' ? (
+        <Card>
+          <Text className="text-muted-light dark:text-muted-dark">
+            Delivery addresses are saved per order and during onboarding.
+          </Text>
+        </Card>
+      ) : null}
+      {section === 'preferences' ? (
+        <Card>
+          <Text className="text-muted-light dark:text-muted-dark">
+            Appearance follows your device light or dark mode in the mobile app.
+          </Text>
+        </Card>
+      ) : null}
+      {section === 'referrals' ? (
+        <Card className="gap-3">
+          <Text className="font-semibold text-foreground-light dark:text-foreground-dark">
+            Invite friends to Pepsa
+          </Text>
+          <Text className="text-muted-light dark:text-muted-dark">
+            Referral rewards launch soon. Your invitation code is your PEPSA
+            account number when available.
+          </Text>
+          <Data label="Invitation code" value={profile?.accountNumber} />
+        </Card>
+      ) : null}
       {section === 'personal' ? (
         <Card>
           <Field label="Full name">

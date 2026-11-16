@@ -18,11 +18,21 @@ import { useSession } from '@/providers/session-provider';
 import { walletApi, type WalletOverview, type WalletTransaction } from './api';
 
 const actions = [
-  { id: 'transfer', label: 'Transfer' },
-  { id: 'data', label: 'Data' },
-  { id: 'airtime', label: 'Airtime' },
-  { id: 'electricity', label: 'Electric' },
-  { id: 'cable-tv', label: 'Cable TV' },
+  {
+    id: 'transfer',
+    label: 'Transfer',
+    route: 'payment' as const,
+    type: 'transfer' as const,
+  },
+  { id: 'deposit', label: 'Deposit', route: 'deposit' as const },
+  {
+    id: 'airtime',
+    label: 'Top-up',
+    route: 'payment' as const,
+    type: 'airtime' as const,
+  },
+  { id: 'bills', label: 'Bills', route: 'bills' as const },
+  { id: 'history', label: 'History', route: 'history' as const },
 ];
 const money = (value: string) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(
@@ -143,20 +153,34 @@ export function WalletScreen() {
           {actions.map((action) => (
             <Pressable
               key={action.id}
-              className="w-[31%] items-center rounded-2xl border border-border-light bg-surface-light p-3 dark:border-border-dark dark:bg-surface-dark"
-              onPress={() =>
+              className="w-[18%] min-w-[64px] flex-1 items-center rounded-2xl border border-border-light bg-surface-light p-3 dark:border-border-dark dark:bg-surface-dark"
+              onPress={() => {
+                if (action.route === 'deposit') {
+                  router.push('/(app)/wallet/deposit' as never);
+                  return;
+                }
+                if (action.route === 'history') {
+                  router.push('/(app)/wallet/history' as never);
+                  return;
+                }
+                if (action.route === 'bills') {
+                  router.push('/(app)/wallet/bills' as never);
+                  return;
+                }
                 router.push({
                   pathname: '/(app)/wallet/payment',
-                  params: { type: action.id },
-                })
-              }
+                  params: {
+                    type: action.type,
+                  },
+                });
+              }}
             >
-              <View className="mb-2 size-10 items-center justify-center rounded-xl bg-primary-light/10">
-                <Text className="text-lg font-bold text-primary-light">
+              <View className="mb-2 size-10 items-center justify-center rounded-xl bg-primary-light/10 dark:bg-primary-dark/20">
+                <Text className="text-lg font-bold text-primary-light dark:text-primary-dark">
                   {action.label[0]}
                 </Text>
               </View>
-              <Text className="text-xs font-semibold text-foreground-light dark:text-foreground-dark">
+              <Text className="text-center text-[10px] font-semibold text-foreground-light dark:text-foreground-dark">
                 {action.label}
               </Text>
             </Pressable>

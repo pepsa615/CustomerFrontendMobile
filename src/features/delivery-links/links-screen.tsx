@@ -1,36 +1,73 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Share, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/screen';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Alert, Radio } from '@/components/ui/controls';
+import { Alert } from '@/components/ui/controls';
 import { EmptyState } from '@/components/ui/state';
 import { useSession } from '@/providers/session-provider';
-import { shareDeliveryLink } from '@/utils/share';
 import { linksApi, money, type Link, type Draft } from './api';
+
+const pickupOptions = [
+  { value: 'customer' as const, label: 'Pickup from customer' },
+  { value: 'business' as const, label: 'From my business address' },
+];
+
+const payerOptions = [
+  { value: 'customer' as const, label: 'Payment from customer' },
+  { value: 'vendor' as const, label: 'Paying from my Pepsa wallet' },
+];
+
+function summaryBody(pickup: 'customer' | 'business', payer: 'customer' | 'vendor') {
+  if (pickup === 'customer' && payer === 'customer') {
+    return 'Your customer schedules pickup and pays delivery charges.';
+  }
+  if (pickup === 'customer' && payer === 'vendor') {
+    return 'Customer schedules pickup; you pay from your PEPSA wallet.';
+  }
+  if (pickup === 'business' && payer === 'customer') {
+    return 'Pickup from your shop; customer pays delivery.';
+  }
+  return 'Pickup from your shop; you pay from your PEPSA wallet.';
+}
+
 export function LinksScreen() {
+  const router = useRouter();
   const { accessToken } = useSession();
   const [links, setLinks] = useState<Link[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [pickup, setPickup] = useState<'customer' | 'business'>('customer');
   const [payer, setPayer] = useState<'customer' | 'vendor'>('customer');
+  const [profileReady, setProfileReady] = useState(false);
   const [pin, setPin] = useState('');
   const [message, setMessage] = useState('');
+
   const load = useCallback(() => {
     if (!accessToken) return;
     linksApi
+      .business(accessToken)
+      .then(() => {
+        setProfileReady(true);
+      })
+      .catch(() => {
+        setProfileReady(false);
+        setMessage('Set your business profile to enable delivery links.');
+      });
+    linksApi
       .links(accessToken)
       .then(setLinks)
-      .catch(() => setMessage('Complete your business profile first.'));
+      .catch(() => undefined);
     linksApi
       .drafts(accessToken)
       .then(setDrafts)
       .catch(() => undefined);
   }, [accessToken]);
+
   useFocusEffect(load);
+
   const selected = useMemo(
     () =>
       links.find(
@@ -38,6 +75,7 @@ export function LinksScreen() {
       ),
     [links, pickup, payer],
   );
+
   async function sendOut(id: string) {
     if (!accessToken || pin.length !== 4) {
       setMessage('Enter your four-digit transaction PIN.');
@@ -52,66 +90,96 @@ export function LinksScreen() {
       setMessage(error instanceof Error ? error.message : 'Send-out failed');
     }
   }
+
+  const active = Boolean(selected?.active && profileReady);
+
   return (
     <Screen
       title="Delivery link"
       description="Share a link with your customer by need"
     >
       {message ? <Alert>{message}</Alert> : null}
+      {!profileReady ? (
+        <Alert>
+          Complete your business profile to copy and share links.
+          <View className="mt-3">
+            <Button onPress={() => router.push('/(app)/business')}>
+              Set your profile
+            </Button>
+          </View>
+        </Alert>
+      ) : null}
       <Card>
-        <Text className="font-semibold text-foreground-light dark:text-foreground-dark">
+        <Text className="text-sm text-muted-light dark:text-muted-dark">
+          Share link with customer by need?
+        </Text>
+        <Text className="mt-4 font-semibold text-foreground-light dark:text-foreground-dark">
           Pickup source
         </Text>
-        <Radio
-          label="Pickup from customer"
-          selected={pickup === 'customer'}
-          onPress={() => setPickup('customer')}
-        />
-        <Radio
-          label="From my business address"
-          selected={pickup === 'business'}
-          onPress={() => setPickup('business')}
-        />
+        <View className="mt-2 gap-2">
+          {pickupOptions.map((option) => (
+            <OptionRow
+              key={option.value}
+              label={option.label}
+              selected={pickup === option.value}
+              onPress={() => setPickup(option.value)}
+            />
+          ))}
+        </View>
         <Text className="mt-4 font-semibold text-foreground-light dark:text-foreground-dark">
           Who is paying for delivery
         </Text>
-        <Radio
-          label="Payment from customer"
-          selected={payer === 'customer'}
-          onPress={() => setPayer('customer')}
-        />
-        <Radio
-          label="From my PEPSA wallet"
-          selected={payer === 'vendor'}
-          onPress={() => setPayer('vendor')}
-        />
-        <View className="my-4 rounded-2xl border border-primary-light/20 bg-primary-light/5 p-4">
-          <Text className="font-semibold text-foreground-light dark:text-foreground-dark">
-            {pickup === 'customer'
-              ? 'Customer sends the item'
-              : 'You send the item'}{' '}
-            &amp; {payer === 'customer' ? 'pays the cost' : 'you pay the cost'}
-          </Text>
+        <View className="mt-2 gap-2">
+          {payerOptions.map((option) => (
+            <OptionRow
+              key={option.value}
+              label={option.label}
+              selected={payer === option.value}
+              onPress={() => setPayer(option.value)}
+            />
+          ))}
         </View>
-        <View className="gap-3">
-          <Button
-            disabled={!selected?.active}
-            onPress={async () => {
-              if (!selected) return;
+        <View className="my-5 flex-row gap-3 border-b border-border-light pb-5 dark:border-border-dark">
+          <View className="rounded-xl bg-primary-light/10 px-3 py-2 dark:bg-primary-dark/20">
+            <Text className="text-lg text-primary-light dark:text-primary-dark">⛓</Text>
+          </View>
+          <View className="flex-1">
+            <Text className="font-bold text-foreground-light dark:text-foreground-dark">
+              {pickup === 'customer' ? 'Customer sends the item' : 'You send the item'}{' '}
+              &amp; {payer === 'customer' ? 'customer pays' : 'you pay'}
+            </Text>
+            <Text className="mt-1 text-sm text-muted-light dark:text-muted-dark">
+              {summaryBody(pickup, payer)}
+            </Text>
+          </View>
+        </View>
+        <Button
+          disabled={!active}
+          onPress={async () => {
+            if (!selected) return;
+            await Clipboard.setStringAsync(selected.url);
+            setMessage('Delivery link copied.');
+          }}
+        >
+          Copy the link
+        </Button>
+        <Pressable
+          className="mt-4 flex-row items-center justify-center gap-2"
+          disabled={!active}
+          onPress={async () => {
+            if (!selected) return;
+            try {
+              await Share.share({ message: selected.url, title: 'Delivery link' });
+            } catch {
               await Clipboard.setStringAsync(selected.url);
               setMessage('Delivery link copied.');
-            }}
-          >
-            Copy the link
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={!selected?.active}
-            onPress={() => selected && shareDeliveryLink(selected.url)}
-          >
-            Share the link
-          </Button>
-        </View>
+            }
+          }}
+        >
+          <Text className="text-sm font-semibold text-primary-light dark:text-primary-dark">
+            Share the link ↗
+          </Text>
+        </Pressable>
       </Card>
       <Text className="text-xl font-bold text-foreground-light dark:text-foreground-dark">
         Draft orders
@@ -152,5 +220,30 @@ export function LinksScreen() {
         />
       )}
     </Screen>
+  );
+}
+
+function OptionRow({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      className={`rounded-xl border px-4 py-3 ${
+        selected
+          ? 'border-primary-light bg-primary-light/10 dark:border-primary-dark dark:bg-primary-dark/15'
+          : 'border-border-light dark:border-border-dark'
+      }`}
+      onPress={onPress}
+    >
+      <Text className="font-medium text-foreground-light dark:text-foreground-dark">
+        {label}
+      </Text>
+    </Pressable>
   );
 }

@@ -1,48 +1,52 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
-import { Screen } from '@/components/ui/screen';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input, PasswordInput } from '@/components/ui/input';
-import { Alert, Switch, Tabs } from '@/components/ui/controls';
+import { Input } from '@/components/ui/input';
+import { Alert, Tabs } from '@/components/ui/controls';
 import { useSession } from '@/providers/session-provider';
 import {
   walletApi,
   type Bank,
   type Beneficiary,
   type TransactionReadiness,
+  type WalletLoyalty,
   type WalletTransaction,
 } from './api';
+import { WalletFlowHeader } from './components/wallet-flow-header';
+import { WalletPickerSheet } from './components/wallet-picker-sheet';
+import { PaymentReview } from './components/payment-review';
 
 type Kind = 'transfer' | 'airtime' | 'data' | 'electricity' | 'cable-tv';
 const titles: Record<Kind, string> = {
   transfer: 'Transfer',
   airtime: 'Mobile Top-Up',
-  data: 'Buy Data',
-  electricity: 'Electricity',
-  'cable-tv': 'Cable TV',
+  data: 'Mobile Top-Up',
+  electricity: 'Bill Payment',
+  'cable-tv': 'Bill Payment',
 };
 
 export function PaymentScreen() {
   const params = useLocalSearchParams<{ type?: string }>();
   const kind = (params.type ?? 'transfer') as Kind;
   const { accessToken } = useSession();
+  const [step, setStep] = useState<'form' | 'review'>('form');
   const [scope, setScope] = useState('internal');
   const [account, setAccount] = useState('');
   const [bankCode, setBankCode] = useState('');
   const [bankName, setBankName] = useState('PEPSA');
   const [banks, setBanks] = useState<Bank[]>([]);
-  const [bankSearch, setBankSearch] = useState('');
-  const [choosingBank, setChoosingBank] = useState(false);
   const [accountName, setAccountName] = useState('');
   const [phone, setPhone] = useState('');
   const [provider, setProvider] = useState('');
+  const [providerName, setProviderName] = useState('');
   const [amount, setAmount] = useState('');
   const [pin, setPin] = useState('');
   const [nin, setNin] = useState('');
   const [needsNin, setNeedsNin] = useState(false);
   const [save, setSave] = useState(false);
+  const [usePoints, setUsePoints] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [readiness, setReadiness] = useState<TransactionReadiness | null>(null);
@@ -52,21 +56,43 @@ export function PaymentScreen() {
   >([]);
   const [productId, setProductId] = useState('');
   const [validationReference, setValidationReference] = useState('');
+  const [loyalty, setLoyalty] = useState<WalletLoyalty | null>(null);
+  const [balance, setBalance] = useState('0');
+  const [billers, setBillers] = useState<{ id: string; name: string }[]>([]);
+  const [picker, setPicker] = useState<
+    'bank' | 'provider' | 'airtime-beneficiary' | 'plan' | null
+  >(null);
+  const [topUpType, setTopUpType] = useState<'airtime' | 'data'>(
+    kind === 'data' ? 'data' : 'airtime',
+  );
+
   const transfer = kind === 'transfer';
   const bill = kind === 'electricity' || kind === 'cable-tv';
+  const effectiveKind: Kind =
+    kind === 'airtime' || kind === 'data' ? topUpType : kind;
+
+  const bankItems = useMemo(
+    () =>
+      banks
+        .map((bank) => ({
+          id: bank.attributes?.nipCode ?? bank.code ?? bank.id ?? '',
+          label: bank.attributes?.name ?? bank.name ?? '',
+        }))
+        .filter((b) => b.id && b.label)
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [banks],
+  );
+
   useEffect(() => {
     if (!accessToken) return;
+    void walletApi.readiness(accessToken).then(setReadiness);
     void walletApi
-      .readiness(accessToken)
-      .then(setReadiness)
-      .catch((cause) =>
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : 'Could not check payment readiness',
-        ),
-      );
-  }, [accessToken]);
+      .overview(accessToken)
+      .then((w) => setBalance(w.availableBalance));
+    if (kind === 'airtime' || kind === 'data')
+      void walletApi.loyalty(accessToken).then(setLoyalty);
+  }, [accessToken, kind]);
+
   useEffect(() => {
     if (
       !accessToken ||
@@ -92,10 +118,11 @@ export function PaymentScreen() {
     );
     return () => clearTimeout(timer);
   }, [accessToken, transfer, scope, account, bankCode]);
+
   useEffect(() => {
     if (
       !accessToken ||
-      !['airtime', 'data'].includes(kind) ||
+      !['airtime', 'data'].includes(effectiveKind) ||
       phone.length !== 11
     )
       return;
@@ -108,46 +135,65 @@ export function PaymentScreen() {
       300,
     );
     return () => clearTimeout(timer);
-  }, [accessToken, kind, phone]);
+  }, [accessToken, effectiveKind, phone]);
+
   useEffect(() => {
-    if (accessToken && transfer)
-      void walletApi
-        .beneficiaries(accessToken)
-        .then(setBeneficiaries)
-        .catch(() => setBeneficiaries([]));
-  }, [accessToken, transfer]);
+    if (accessToken && (transfer || effectiveKind === 'airtime'))
+      void walletApi.beneficiaries(accessToken).then(setBeneficiaries);
+  }, [accessToken, transfer, effectiveKind]);
+
   useEffect(() => {
     if (!accessToken || !transfer || scope !== 'external') return;
-    void walletApi
-      .banks(accessToken)
-      .then(setBanks)
-      .catch(() => setError('Could not load the bank list. Please retry.'));
+    void walletApi.banks(accessToken).then(setBanks);
   }, [accessToken, transfer, scope]);
+
   useEffect(() => {
-    if (!accessToken || kind !== 'data' || phone.length !== 11) return;
-    void walletApi
-      .plans(accessToken, phone)
-      .then(setPlans)
-      .catch(() => setPlans([]));
-  }, [accessToken, kind, phone]);
-  const validateBill = async () => {
-    if (!accessToken) return;
-    setLoading(true);
+    if (!accessToken || effectiveKind !== 'data' || phone.length !== 11) return;
+    void walletApi.plans(accessToken, phone).then(setPlans);
+  }, [accessToken, effectiveKind, phone]);
+
+  useEffect(() => {
+    if (!accessToken || !bill) return;
+    void walletApi.categories(accessToken).then(async (categories) => {
+      const category =
+        categories.find((c) =>
+          kind === 'electricity'
+            ? c.name.toLowerCase().includes('electric')
+            : c.name.toLowerCase().includes('cable') ||
+              c.name.toLowerCase().includes('tv'),
+        ) ?? categories[0];
+      if (!category) return;
+      const list = await walletApi.billers(accessToken, category.id);
+      setBillers(list);
+    });
+  }, [accessToken, bill, kind]);
+
+  const continueToReview = async () => {
     setError('');
-    try {
-      const value = await walletApi.validateBiller(accessToken, {
-        billerId: bankCode || provider,
-        beneficiaryIdentifier: account,
-        fields: { accountNumber: account },
-      });
-      setValidationReference(value.validationReference);
-      setAccountName(value.customerName);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not validate customer');
-    } finally {
-      setLoading(false);
+    if (bill) {
+      if (!accessToken) return;
+      setLoading(true);
+      try {
+        const value = await walletApi.validateBiller(accessToken, {
+          billerId: provider,
+          beneficiaryIdentifier: account,
+          fields: { accountNumber: account },
+        });
+        setValidationReference(value.validationReference);
+        setAccountName(value.customerName);
+        setStep('review');
+      } catch (e) {
+        setError(
+          e instanceof Error ? e.message : 'Could not validate customer',
+        );
+      } finally {
+        setLoading(false);
+      }
+      return;
     }
+    setStep('review');
   };
+
   const submit = async () => {
     if (!accessToken) return;
     setLoading(true);
@@ -175,16 +221,17 @@ export function PaymentScreen() {
       } else {
         result = await walletApi.purchase(
           accessToken,
-          kind,
+          effectiveKind,
           {
-            productProvider: provider || bankName,
+            productProvider: provider || providerName || bankName,
             beneficiaryIdentifier: bill ? account : phone,
             amount: Number(amount),
             pin,
-            ...(kind === 'data' ? { productId } : {}),
+            saveBeneficiary: save,
+            ...(effectiveKind === 'data' ? { productId } : {}),
             ...(bill
               ? {
-                  billerId: bankCode || provider,
+                  billerId: provider,
                   validationReference,
                   customerFields: { accountNumber: account },
                 }
@@ -201,62 +248,121 @@ export function PaymentScreen() {
       const api = e as { code?: string; message?: string };
       if (api.code === 'NIN_REQUIRED') {
         setNeedsNin(true);
+        setStep('form');
         setError('Enter your NIN to continue this external transfer.');
       } else setError(api.message ?? 'Payment could not be completed');
     } finally {
       setLoading(false);
     }
   };
+
+  const canContinue =
+    Number(amount) > 0 &&
+    (transfer
+      ? account.length === 10 &&
+        Boolean(accountName) &&
+        (scope === 'internal' || Boolean(bankCode))
+      : bill
+        ? Boolean(provider) && Boolean(account)
+        : effectiveKind === 'data'
+          ? phone.length === 11 && Boolean(productId)
+          : phone.length === 11);
+
   if (readiness && !readiness.kycComplete) {
     return (
-      <Screen
-        title="Verify your identity"
-        description="Complete a one-time security check before your first transfer or bill payment."
-      >
+      <ScrollView contentContainerClassName="gap-4 px-5 pb-10 pt-14">
         <Card className="gap-4">
-          <Text className="text-lg font-bold text-foreground-light dark:text-foreground-dark">
-            Unlock secure payments
-          </Text>
+          <Text className="text-lg font-bold">Verify your identity</Text>
           <Text className="text-muted-light dark:text-muted-dark">
-            We’ll ask for a selfie and your current location. Your information
-            is encrypted and used to protect your account.
+            Complete KYC before your first transfer or bill payment.
           </Text>
           <Button onPress={() => router.push('/(app)/kyc' as Href)}>
             Start verification
           </Button>
-          <Button variant="ghost" onPress={() => router.back()}>
-            Not now
-          </Button>
         </Card>
-      </Screen>
+      </ScrollView>
     );
   }
   if (readiness && (!readiness.phoneVerified || !readiness.pinSet)) {
     return (
-      <Screen
-        title="Secure your payments"
-        description="Verify your phone and create a four-digit transaction PIN."
-      >
+      <ScrollView contentContainerClassName="gap-4 px-5 pb-10 pt-14">
         <Card className="gap-4">
           <Text className="text-muted-light dark:text-muted-dark">
-            Your transaction PIN is separate from your login password and
-            confirms every payment.
+            Verify your phone and set a transaction PIN first.
           </Text>
           <Button onPress={() => router.push('/(app)/transaction-security')}>
             Set up transaction PIN
           </Button>
-          <Button variant="ghost" onPress={() => router.back()}>
-            Not now
-          </Button>
         </Card>
-      </Screen>
+      </ScrollView>
     );
   }
+
+  if (step === 'review') {
+    const rows = transfer
+      ? [
+          { label: 'Recipient', value: accountName },
+          { label: 'Account number', value: account },
+          { label: 'Bank', value: bankName },
+          { label: 'Amount', value: amount },
+        ]
+      : bill
+        ? [
+            { label: 'Product name', value: effectiveKind.replace('-', ' ') },
+            { label: 'Network operator', value: providerName },
+            { label: 'Account number', value: account },
+            { label: 'Amount', value: amount },
+          ]
+        : [
+            { label: 'Product name', value: effectiveKind },
+            {
+              label: 'Network operator',
+              value: (provider || providerName).toUpperCase(),
+            },
+            { label: 'Recipient mobile', value: phone },
+            { label: 'Amount', value: amount },
+          ];
+    return (
+      <ScrollView
+        className="flex-1 bg-background-light dark:bg-background-dark"
+        contentContainerClassName="px-5 pb-10 pt-14"
+      >
+        <PaymentReview
+          title={
+            transfer
+              ? 'Transfer'
+              : effectiveKind === 'airtime'
+                ? 'Airtime'
+                : bill
+                  ? 'BILLS'
+                  : 'Payment'
+          }
+          amount={Number(amount)}
+          rows={rows}
+          balance={balance}
+          pin={pin}
+          onPinChange={setPin}
+          save={save}
+          onSaveChange={setSave}
+          showSave
+          loyalty={loyalty ?? undefined}
+          usePoints={usePoints}
+          onUsePointsChange={setUsePoints}
+          error={error}
+          loading={loading}
+          onPay={() => void submit()}
+          onBack={() => setStep('form')}
+        />
+      </ScrollView>
+    );
+  }
+
   return (
-    <Screen
-      title={titles[kind]}
-      description="Details are verified before your wallet is charged."
+    <ScrollView
+      className="flex-1 bg-background-light dark:bg-background-dark"
+      contentContainerClassName="gap-4 px-5 pb-10 pt-14"
     >
+      <WalletFlowHeader title={titles[kind]} showHistory={!transfer} />
       {transfer ? (
         <Tabs
           value={scope}
@@ -265,21 +371,15 @@ export function PaymentScreen() {
             setAccountName('');
           }}
           items={[
-            { value: 'internal', label: 'To PEPSA' },
-            { value: 'external', label: 'Other bank' },
+            { value: 'internal', label: 'Pepsa' },
+            { value: 'external', label: 'Other Banks' },
           ]}
         />
       ) : null}
       {transfer && beneficiaries.some((item) => item.scope === scope) ? (
         <View className="gap-2">
-          <Text className="font-semibold text-foreground-light dark:text-foreground-dark">
-            Beneficiaries
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName="gap-2"
-          >
+          <Text className="font-bold">Beneficiary</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {beneficiaries
               .filter((item) => item.scope === scope)
               .map((item) => (
@@ -291,239 +391,205 @@ export function PaymentScreen() {
                     setBankName(item.bankName);
                     setAccountName(item.accountName);
                   }}
-                  className="rounded-xl border border-border-light bg-surface-light px-4 py-3 dark:border-border-dark dark:bg-surface-dark"
+                  className="mr-2 rounded-2xl bg-primary-light/10 px-4 py-3 dark:bg-primary-dark/20"
                 >
-                  <Text className="font-semibold text-foreground-light dark:text-foreground-dark">
+                  <Text className="font-bold text-foreground-light dark:text-foreground-dark">
                     {item.accountName}
                   </Text>
                   <Text className="text-xs text-muted-light dark:text-muted-dark">
-                    {item.bankName} · {item.accountNumber.slice(-4)}
+                    {item.bankName} · {item.accountNumber}
                   </Text>
                 </Pressable>
               ))}
           </ScrollView>
         </View>
       ) : null}
-      <Card className="gap-4">
-        {transfer && scope === 'external' ? (
-          <View className="gap-2">
-            <Text className="font-medium text-foreground-light dark:text-foreground-dark">
-              Bank
-            </Text>
-            <Button
-              variant="secondary"
-              onPress={() => setChoosingBank(!choosingBank)}
-            >
-              {bankCode ? bankName : 'Select a bank'}
-            </Button>
-            {choosingBank ? (
-              <View className="gap-2 rounded-xl border border-border-light p-3 dark:border-border-dark">
-                <Input
-                  accessibilityLabel="Search banks"
-                  value={bankSearch}
-                  onChangeText={setBankSearch}
-                  placeholder="Search bank name"
-                />
-                <ScrollView className="max-h-64" nestedScrollEnabled>
-                  {banks
-                    .map((bank) => ({
-                      code:
-                        bank.attributes?.nipCode ?? bank.code ?? bank.id ?? '',
-                      name: bank.attributes?.name ?? bank.name ?? '',
-                    }))
-                    .filter(
-                      (bank) =>
-                        bank.code &&
-                        bank.name
-                          .toLowerCase()
-                          .includes(bankSearch.toLowerCase()),
-                    )
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((bank) => (
-                      <Pressable
-                        key={`${bank.code}-${bank.name}`}
-                        accessibilityRole="button"
-                        onPress={() => {
-                          setBankCode(bank.code);
-                          setBankName(bank.name);
-                          setAccountName('');
-                          setChoosingBank(false);
-                          setBankSearch('');
-                        }}
-                        className="border-b border-border-light py-3 dark:border-border-dark"
-                      >
-                        <Text className="font-medium text-foreground-light dark:text-foreground-dark">
-                          {bank.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                </ScrollView>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-        {transfer ? (
-          <>
-            <Input
-              accessibilityLabel="Recipient account number"
-              keyboardType="number-pad"
-              maxLength={10}
-              value={account}
-              onChangeText={(v) => {
-                setAccount(v.replace(/\D/g, ''));
-                setAccountName('');
-              }}
-              placeholder="10 digit account number"
-            />
-            {accountName ? (
-              <Text className="font-semibold text-success-light dark:text-success-dark">
-                {accountName}
-              </Text>
-            ) : account.length === 10 ? (
-              <Text className="text-sm text-muted-light">
-                Verifying account…
-              </Text>
-            ) : null}
-          </>
-        ) : null}
-        {!transfer && !bill ? (
-          <>
-            <Input
-              accessibilityLabel="Phone number"
-              keyboardType="phone-pad"
-              maxLength={11}
-              value={phone}
-              onChangeText={(v) => setPhone(v.replace(/\D/g, ''))}
-              placeholder="08012345678"
-            />
-            {provider ? (
-              <Text className="font-semibold text-success-light dark:text-success-dark">
-                Detected {provider.toUpperCase()}
-              </Text>
-            ) : null}
-          </>
-        ) : null}
-        {kind === 'data' && plans.length ? (
-          <View className="gap-2">
-            <Text className="font-semibold text-foreground-light dark:text-foreground-dark">
-              Available plans
-            </Text>
-            {plans.map((plan) => (
-              <Pressable
-                key={plan.productId}
-                onPress={() => {
-                  setProductId(plan.productId);
-                  setAmount(String(plan.amount));
-                }}
-                className={`rounded-xl border p-3 ${productId === plan.productId ? 'border-primary-light bg-primary-light/5' : 'border-border-light dark:border-border-dark'}`}
-              >
-                <Text className="font-semibold text-foreground-light dark:text-foreground-dark">
-                  {plan.name}
-                </Text>
-                <Text className="text-primary-light">
-                  ₦{Number(plan.amount).toLocaleString()}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-        {bill ? (
-          <>
-            <Input
-              accessibilityLabel={
-                kind === 'electricity'
-                  ? 'Electricity provider'
-                  : 'Cable provider'
-              }
-              value={provider}
-              onChangeText={(value) => {
-                setProvider(value);
-                setValidationReference('');
-              }}
-            />
-            <Input
-              accessibilityLabel={
-                kind === 'electricity' ? 'Meter number' : 'Smartcard number'
-              }
-              value={account}
-              onChangeText={(value) => {
-                setAccount(value);
-                setValidationReference('');
-              }}
-            />
-            {accountName ? (
-              <Text className="font-semibold text-success-light dark:text-success-dark">
-                {accountName}
-              </Text>
-            ) : null}
-            <Button
-              variant="secondary"
-              loading={loading}
-              onPress={() => void validateBill()}
-            >
-              Validate customer
-            </Button>
-          </>
-        ) : null}
-        <Input
-          accessibilityLabel="Amount"
-          keyboardType="decimal-pad"
-          value={amount}
-          onChangeText={setAmount}
-          placeholder="0.00"
-        />
-        {needsNin ? (
-          <PasswordInput
-            accessibilityLabel="National Identification Number"
-            keyboardType="number-pad"
-            maxLength={11}
-            value={nin}
-            onChangeText={(v) => setNin(v.replace(/\D/g, ''))}
-          />
-        ) : null}
-        <PasswordInput
-          accessibilityLabel="Transaction PIN"
-          keyboardType="number-pad"
-          maxLength={4}
-          value={pin}
-          onChangeText={(v) => setPin(v.replace(/\D/g, ''))}
-        />
+      {transfer && scope === 'external' ? (
         <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/(app)/transaction-security')}
+          onPress={() => setPicker('bank')}
+          className="h-12 justify-center rounded-xl border border-border-light px-4 dark:border-border-dark"
         >
-          <Text className="font-semibold text-primary-light dark:text-primary-dark">
-            Set up your transaction PIN
+          <Text className="font-medium text-foreground-light dark:text-foreground-dark">
+            {bankCode ? bankName : 'Select Bank'}
           </Text>
         </Pressable>
-        {transfer ? (
-          <Switch
-            value={save}
-            onValueChange={setSave}
-            label="Save as beneficiary"
+      ) : null}
+      {transfer ? (
+        <>
+          <Input
+            accessibilityLabel="Recipient account number"
+            keyboardType="number-pad"
+            maxLength={10}
+            value={account}
+            onChangeText={(v) => {
+              setAccount(v.replace(/\D/g, ''));
+              setAccountName('');
+            }}
+            placeholder="10 digit account number"
           />
-        ) : null}
-        {error ? <Alert tone="danger">{error}</Alert> : null}
-        <Button
-          loading={loading}
-          disabled={
-            !amount ||
-            pin.length !== 4 ||
-            (transfer && !accountName) ||
-            (needsNin && nin.length !== 11) ||
-            (kind === 'data' && !productId) ||
-            (bill && !validationReference)
+          {accountName ? (
+            <Text className="font-semibold text-success-light">
+              {accountName}
+            </Text>
+          ) : null}
+        </>
+      ) : null}
+      {(kind === 'airtime' || kind === 'data') && (
+        <>
+          <Pressable
+            onPress={() =>
+              setTopUpType((t) => (t === 'airtime' ? 'data' : 'airtime'))
+            }
+            className="h-12 justify-center rounded-xl border border-border-light px-4 dark:border-border-dark"
+          >
+            <Text className="font-medium capitalize text-foreground-light dark:text-foreground-dark">
+              Top-Up Type: {topUpType}
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => setPicker('airtime-beneficiary')}>
+            <Text className="font-bold text-foreground-light dark:text-foreground-dark">
+              Select From Beneficiary
+            </Text>
+          </Pressable>
+          <Input
+            accessibilityLabel="Phone number"
+            keyboardType="phone-pad"
+            maxLength={11}
+            value={phone}
+            onChangeText={(v) => setPhone(v.replace(/\D/g, ''))}
+            placeholder="Enter phone number"
+          />
+          {provider ? (
+            <Text className="font-semibold text-success-light">
+              {provider.toUpperCase()}
+            </Text>
+          ) : null}
+          {effectiveKind === 'data' ? (
+            <Pressable
+              onPress={() => setPicker('plan')}
+              className="h-12 justify-center rounded-xl border border-border-light px-4 dark:border-border-dark"
+            >
+              <Text className="font-medium text-foreground-light dark:text-foreground-dark">
+                {productId
+                  ? (plans.find((p) => p.productId === productId)?.name ??
+                    'Plan selected')
+                  : 'Select data plan'}
+              </Text>
+            </Pressable>
+          ) : null}
+        </>
+      )}
+      {bill ? (
+        <>
+          <Pressable
+            onPress={() => setPicker('provider')}
+            className="h-12 justify-center rounded-xl border border-border-light px-4 dark:border-border-dark"
+          >
+            <Text className="font-medium text-foreground-light dark:text-foreground-dark">
+              {providerName || 'Select Provider'}
+            </Text>
+          </Pressable>
+          <Input
+            accessibilityLabel="Account or smartcard"
+            value={account}
+            onChangeText={(value) => {
+              setAccount(value);
+              setValidationReference('');
+            }}
+            placeholder={
+              kind === 'electricity'
+                ? 'enter account number'
+                : 'enter smart card number'
+            }
+          />
+        </>
+      ) : null}
+      <Input
+        accessibilityLabel="Amount"
+        keyboardType="decimal-pad"
+        value={amount}
+        onChangeText={setAmount}
+        placeholder="Enter Amount in Figure"
+      />
+      {needsNin ? (
+        <Input
+          accessibilityLabel="NIN"
+          keyboardType="number-pad"
+          maxLength={11}
+          value={nin}
+          onChangeText={(v) => setNin(v.replace(/\D/g, ''))}
+        />
+      ) : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      <Button
+        loading={loading}
+        disabled={!canContinue}
+        className="mt-2 h-14 rounded-2xl"
+        onPress={() => void continueToReview()}
+      >
+        {bill ? 'Pay' : 'Continue'}
+      </Button>
+      <WalletPickerSheet
+        visible={picker === 'bank'}
+        title="Select Bank"
+        items={bankItems}
+        selectedId={bankCode}
+        onSelect={(id) => {
+          const bank = bankItems.find((b) => b.id === id);
+          setBankCode(id);
+          setBankName(bank?.label ?? '');
+          setAccountName('');
+        }}
+        onClose={() => setPicker(null)}
+      />
+      <WalletPickerSheet
+        visible={picker === 'provider'}
+        title="Select Provider"
+        items={billers.map((b) => ({ id: b.id, label: b.name }))}
+        selectedId={provider}
+        onSelect={(id) => {
+          const item = billers.find((b) => b.id === id);
+          setProvider(id);
+          setProviderName(item?.name ?? '');
+        }}
+        onClose={() => setPicker(null)}
+      />
+      <WalletPickerSheet
+        visible={picker === 'airtime-beneficiary'}
+        title="Beneficiary"
+        items={beneficiaries
+          .filter((b) => b.scope === 'airtime')
+          .map((b) => ({
+            id: b.id,
+            label: b.accountName,
+            meta: `${b.bankName} · ${b.accountNumber}`,
+          }))}
+        selectedId=""
+        onSelect={(id) => {
+          const item = beneficiaries.find((b) => b.id === id);
+          if (item) {
+            setPhone(item.accountNumber);
+            setProvider(item.bankName);
           }
-          onPress={() => void submit()}
-        >
-          Pay
-        </Button>
-      </Card>
-      <Pressable onPress={() => router.back()} accessibilityRole="button">
-        <Text className="text-center font-semibold text-primary-light dark:text-primary-dark">
-          Cancel
-        </Text>
-      </Pressable>
-    </Screen>
+        }}
+        onClose={() => setPicker(null)}
+      />
+      <WalletPickerSheet
+        visible={picker === 'plan'}
+        title="Data plan"
+        items={plans.map((p) => ({
+          id: p.productId,
+          label: p.name,
+          meta: `₦${Number(p.amount).toLocaleString()}`,
+        }))}
+        selectedId={productId}
+        onSelect={(id) => {
+          const plan = plans.find((p) => p.productId === id);
+          setProductId(id);
+          if (plan) setAmount(String(plan.amount));
+        }}
+        onClose={() => setPicker(null)}
+      />
+    </ScrollView>
   );
 }

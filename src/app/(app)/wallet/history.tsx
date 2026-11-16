@@ -1,0 +1,1 @@
+export { WalletHistoryScreen as default } from '@/features/wallet/history-screen';

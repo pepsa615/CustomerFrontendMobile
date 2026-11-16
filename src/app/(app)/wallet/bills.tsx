@@ -1,0 +1,1 @@
+export { BillsScreen as default } from '@/features/wallet/bills-screen';

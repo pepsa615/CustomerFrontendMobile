@@ -49,6 +49,12 @@ export type TransactionReadiness = {
   pinSet: boolean;
   transactionReady: boolean;
 };
+export type WalletLoyalty = {
+  enabled: boolean;
+  points: number;
+  discountNaira: number;
+  label: string;
+};
 export const walletApi = {
   overview: (token: string) => apiRequest<WalletOverview>('/wallet', token),
   readiness: (token: string) =>
@@ -106,4 +112,22 @@ export const walletApi = {
       headers: { 'Idempotency-Key': key },
       body: JSON.stringify(body),
     }),
+  categories: (token: string) =>
+    apiRequest<{ id: string; name: string }[]>(
+      '/vas/billers/categories',
+      token,
+    ),
+  billers: (token: string, categoryId: string) =>
+    apiRequest<{ id: string; name: string }[]>(
+      `/vas/billers/categories/${categoryId}`,
+      token,
+    ),
+  loyalty: (token: string) =>
+    apiRequest<WalletLoyalty>('/wallet/loyalty', token),
+  emailStatement: (token: string, body: { from: string; to: string }) =>
+    apiRequest<{ sent: boolean; count: number }>(
+      '/wallet/transactions/statement/email',
+      token,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
 };

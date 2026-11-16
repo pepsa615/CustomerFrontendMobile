@@ -30,7 +30,7 @@ export default function VerifyEmail() {
         }),
       });
       await acceptSession(data);
-      router.replace('/(app)/(tabs)');
+      router.replace('/(auth)/verify-phone' as never);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Verification failed');
     }

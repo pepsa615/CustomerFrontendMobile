@@ -1,0 +1,1 @@
+export { WalletDepositScreen as default } from '@/features/wallet/deposit-screen';
