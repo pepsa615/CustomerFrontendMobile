@@ -16,7 +16,9 @@ export default function SignUp() {
     gender: 'FEMALE',
     password: '',
   });
-  const [accepted, setAccepted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [indemnityAccepted, setIndemnityAccepted] = useState(false);
   const [error, setError] = useState('');
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -30,8 +32,9 @@ export default function SignUp() {
           method: 'POST',
           body: JSON.stringify({
             ...form,
-            termsAccepted: accepted,
-            privacyAccepted: accepted,
+            termsAccepted,
+            privacyAccepted,
+            indemnityAccepted,
           }),
         },
       );
@@ -102,12 +105,10 @@ export default function SignUp() {
           value={form.password}
           onChangeText={set('password')}
         />
-        <Switch
-          value={accepted}
-          onValueChange={setAccepted}
-          label="I accept the Terms and Privacy Policy"
-        />
-        <Button disabled={!accepted} onPress={submit}>
+        <Switch value={termsAccepted} onValueChange={setTermsAccepted} label="I accept the Terms and Conditions" />
+        <Switch value={privacyAccepted} onValueChange={setPrivacyAccepted} label="I accept the Privacy Policy" />
+        <Switch value={indemnityAccepted} onValueChange={setIndemnityAccepted} label="I accept the Indemnity Agreement" />
+        <Button disabled={!termsAccepted || !privacyAccepted || !indemnityAccepted} onPress={submit}>
           Create account
         </Button>
       </View>

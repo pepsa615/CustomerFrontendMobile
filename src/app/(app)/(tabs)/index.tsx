@@ -46,7 +46,7 @@ export default function HomeScreen() {
       </Card>
       <View className="flex-row gap-3">
         <Link href="/(app)/business" asChild>
-          <Button variant="secondary">Business</Button>
+          <Button variant="secondary">Set up your business</Button>
         </Link>
         <Link href="/(app)/delivery-links" asChild>
           <Button variant="secondary">Delivery links</Button>

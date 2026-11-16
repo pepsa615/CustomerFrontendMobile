@@ -9,6 +9,7 @@ export const linksApi = {
   links: (token: string) => apiRequest<Link[]>('/delivery-links', token),
   drafts: (token: string) => apiRequest<Draft[]>('/delivery-links/drafts/list', token),
   settlement: (token: string) => apiRequest<Settlement>('/delivery-links/settlement/summary', token),
+  resolveLocation: (token: string, input: { latitude: number; longitude: number } | { address: string }) => apiRequest<{ latitude: number; longitude: number; formattedAddress: string }>('/account/onboarding/location', token, { method: 'POST', body: JSON.stringify(input) }),
   sendOut: (token: string, id: string, pin: string) => apiRequest<Draft>(`/delivery-links/drafts/${encodeURIComponent(id)}/send-out`, token, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ pin }) }),
 };
 export const money = (value: { currency: string; minorUnits: number }) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: value.currency }).format(value.minorUnits / 100);

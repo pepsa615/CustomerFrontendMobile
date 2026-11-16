@@ -79,11 +79,18 @@ export function BusinessScreen() {
     const value = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     });
+    if (!accessToken) return;
+    const place = await linksApi.resolveLocation(accessToken, {
+      latitude: value.coords.latitude,
+      longitude: value.coords.longitude,
+    });
     setForm((current) => ({
       ...current,
-      latitude: String(value.coords.latitude),
-      longitude: String(value.coords.longitude),
+      latitude: String(place.latitude),
+      longitude: String(place.longitude),
+      address: place.formattedAddress || current.address,
     }));
+    setMessage('Location found. Confirm the address before saving.');
   }
   async function chooseLogo() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -180,8 +187,6 @@ export function BusinessScreen() {
             {field('address', 'Business location')}
             {field('city', 'City')}
             {field('state', 'State')}
-            {field('latitude', 'Latitude', 'numeric')}
-            {field('longitude', 'Longitude', 'numeric')}
             {field('houseAddress', 'Building / floor')}
             {field('landmark', 'Landmark')}
             <Button variant="secondary" onPress={currentLocation}>
