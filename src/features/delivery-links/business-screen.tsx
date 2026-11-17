@@ -5,6 +5,7 @@ import { Screen } from '@/components/ui/screen';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { AddressSearchInput } from '@/components/address-search-input';
 import { Alert, Radio } from '@/components/ui/controls';
 import { useSession } from '@/providers/session-provider';
 import { linksApi, money, type Settlement } from './api';
@@ -38,6 +39,7 @@ export function BusinessScreen() {
   const [message, setMessage] = useState('');
   const [settlement, setSettlement] = useState<Settlement>();
   const [logo, setLogo] = useState<ImagePicker.ImagePickerAsset>();
+  const [addressSelected, setAddressSelected] = useState(false);
   const [form, setForm] = useState(empty);
   useEffect(() => {
     if (!accessToken) return;
@@ -45,6 +47,7 @@ export function BusinessScreen() {
       .business(accessToken)
       .then(({ business }) => {
         setExists(true);
+        setAddressSelected(true);
         setEditing(false);
         setForm({
           ...empty,
@@ -74,6 +77,12 @@ export function BusinessScreen() {
   }
   async function save() {
     if (!accessToken) return;
+    if (!addressSelected) {
+      setMessage(
+        'Search for and select the business address from the suggestions.',
+      );
+      return;
+    }
     setBusy(true);
     setMessage('');
     try {
@@ -157,7 +166,23 @@ export function BusinessScreen() {
               : null}
             {field('businessName', 'Business name')}
             {field('phoneNumber', 'Phone number', 'phone-pad')}
-            {field('address', 'Business location')}
+            <AddressSearchInput
+              label="Business location"
+              value={form.address}
+              onChange={(address) => {
+                setAddressSelected(false);
+                setForm((current) => ({ ...current, address }));
+              }}
+              onSelect={(address) => {
+                setAddressSelected(true);
+                setForm((current) => ({
+                  ...current,
+                  address: address.formattedAddress,
+                  city: address.city,
+                  state: address.state,
+                }));
+              }}
+            />
             {field('city', 'City')}
             {field('state', 'State')}
             {field('houseAddress', 'Building / floor')}

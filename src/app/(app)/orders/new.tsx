@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { AddressSearchInput } from '@/components/address-search-input';
 import { useSession } from '@/providers/session-provider';
 import {
   money,
@@ -21,6 +22,10 @@ export default function NewOrderScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [order, setOrder] = useState<Order>();
+  const [selectedRoute, setSelectedRoute] = useState({
+    pickup: false,
+    delivery: false,
+  });
   const [pin, setPin] = useState('');
   const [quick, setQuick] = useState<QuickQuoteInput>({
     deliveryType: 'last_mile',
@@ -54,6 +59,8 @@ export default function NewOrderScreen() {
   });
 
   const routeReady =
+    selectedRoute.pickup &&
+    selectedRoute.delivery &&
     quick.pickup.address &&
     quick.pickup.city &&
     quick.pickup.state &&
@@ -134,12 +141,26 @@ export default function NewOrderScreen() {
           <Text className="text-sm text-muted-light dark:text-muted-dark">
             Get a price from pickup and delivery locations first.
           </Text>
-          <Input
-            placeholder="Pickup address"
+          <AddressSearchInput
+            label="Pickup address"
             value={quick.pickup.address}
-            onChangeText={(v) =>
-              setQuick({ ...quick, pickup: { ...quick.pickup, address: v } })
-            }
+            onChange={(v) => {
+              setSelectedRoute((current) => ({ ...current, pickup: false }));
+              setQuick({ ...quick, pickup: { ...quick.pickup, address: v } });
+            }}
+            onSelect={(address) => {
+              setSelectedRoute((current) => ({ ...current, pickup: true }));
+              setQuick({
+                ...quick,
+                pickup: {
+                  ...quick.pickup,
+                  address: address.formattedAddress,
+                  city: address.city,
+                  state: address.state,
+                  country: address.country,
+                },
+              });
+            }}
           />
           <Input
             placeholder="Pickup city"
@@ -155,12 +176,29 @@ export default function NewOrderScreen() {
               setQuick({ ...quick, pickup: { ...quick.pickup, state: v } })
             }
           />
-          <Input
-            placeholder="Delivery address"
+          <AddressSearchInput
+            label="Delivery address"
             value={quick.delivery.address}
-            onChangeText={(v) =>
-              setQuick({ ...quick, delivery: { ...quick.delivery, address: v } })
-            }
+            onChange={(v) => {
+              setSelectedRoute((current) => ({ ...current, delivery: false }));
+              setQuick({
+                ...quick,
+                delivery: { ...quick.delivery, address: v },
+              });
+            }}
+            onSelect={(address) => {
+              setSelectedRoute((current) => ({ ...current, delivery: true }));
+              setQuick({
+                ...quick,
+                delivery: {
+                  ...quick.delivery,
+                  address: address.formattedAddress,
+                  city: address.city,
+                  state: address.state,
+                  country: address.country,
+                },
+              });
+            }}
           />
           <Input
             placeholder="Delivery city"
@@ -231,7 +269,11 @@ export default function NewOrderScreen() {
             }
           />
           <View className="flex-row gap-3">
-            <Button variant="secondary" className="flex-1" onPress={() => setStep('delivery')}>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onPress={() => setStep('delivery')}
+            >
               Back
             </Button>
             <Button className="flex-1" onPress={() => setStep('pay')}>
