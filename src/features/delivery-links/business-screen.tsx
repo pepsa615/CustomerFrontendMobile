@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { Screen } from '@/components/ui/screen';
 import { Card } from '@/components/ui/card';
@@ -27,8 +26,6 @@ const empty = {
   address: '',
   city: '',
   state: '',
-  latitude: '',
-  longitude: '',
   houseAddress: '',
   landmark: '',
 };
@@ -58,8 +55,6 @@ export function BusinessScreen() {
           address: String(business.address ?? ''),
           city: String(business.city ?? ''),
           state: String(business.state ?? ''),
-          latitude: String(business.latitude ?? ''),
-          longitude: String(business.longitude ?? ''),
           houseAddress: String(business.houseAddress ?? ''),
           landmark: String(business.landmark ?? ''),
         });
@@ -70,28 +65,6 @@ export function BusinessScreen() {
       .then(setSettlement)
       .catch(() => undefined);
   }, [accessToken]);
-  async function currentLocation() {
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (permission.status !== 'granted') {
-      setMessage('Location permission was not granted.');
-      return;
-    }
-    const value = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-    if (!accessToken) return;
-    const place = await linksApi.resolveLocation(accessToken, {
-      latitude: value.coords.latitude,
-      longitude: value.coords.longitude,
-    });
-    setForm((current) => ({
-      ...current,
-      latitude: String(place.latitude),
-      longitude: String(place.longitude),
-      address: place.formattedAddress || current.address,
-    }));
-    setMessage('Location found. Confirm the address before saving.');
-  }
   async function chooseLogo() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -189,9 +162,6 @@ export function BusinessScreen() {
             {field('state', 'State')}
             {field('houseAddress', 'Building / floor')}
             {field('landmark', 'Landmark')}
-            <Button variant="secondary" onPress={currentLocation}>
-              Use current location
-            </Button>
             <Button variant="secondary" onPress={chooseLogo}>
               {logo ? 'Logo selected' : 'Choose business logo'}
             </Button>

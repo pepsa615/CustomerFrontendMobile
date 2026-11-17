@@ -19,7 +19,13 @@ const more = [
   ['about', 'About'],
 ] as const;
 
-function MenuGroup({ title, rows }: { title: string; rows: readonly (readonly [string, string])[] }) {
+function MenuGroup({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: readonly (readonly [string, string])[];
+}) {
   return (
     <View className="rounded-3xl border border-primary-light/15 bg-primary-light/5 p-3 dark:border-primary-dark/20 dark:bg-primary-dark/10">
       <Text className="mb-2 px-2 text-xs font-bold uppercase text-muted-light dark:text-muted-dark">
@@ -65,6 +71,12 @@ export function SettingsHomeScreen() {
       </Card>
       <View className="mt-4 gap-4">
         <MenuGroup title="Personal details" rows={personal} />
+        <Button
+          variant="secondary"
+          onPress={() => router.push('/(app)/business')}
+        >
+          Business profile
+        </Button>
         <MenuGroup title="More" rows={more} />
       </View>
       <Button variant="ghost" className="mt-4" onPress={logout}>
