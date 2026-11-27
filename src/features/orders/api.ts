@@ -89,6 +89,7 @@ export const ordersApi = {
       categories: string[];
       handlingModes: string[];
       lastMileVehicles: string[];
+      vehiclesByCategory?: Record<string, string[]>;
     }>('/orders/options', token),
   uploadMedia: (token: string, uri: string) => {
     const body = new FormData();
