@@ -4,8 +4,13 @@
     "slug": "pepsa-customer",
     "description": "Book and track deliveries, manage your wallet, pay bills and run your business securely with PEPSA.",
     "version": "1.0.0",
-    "runtimeVersion": { "policy": "appVersion" },
-    "updates": { "fallbackToCacheTimeout": 0, "checkAutomatically": "ON_LOAD" },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/pepsa-app-icon.png",
     "scheme": "pepsa",
@@ -77,7 +82,9 @@
         }
       ],
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-image",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
