@@ -250,6 +250,7 @@ export default function NewOrderScreen() {
               setQuick({
                 ...quick,
                 pickup: {
+                  placeId: result.placeId,
                   address: result.formattedAddress,
                   city: result.city,
                   state: result.state,
@@ -270,6 +271,7 @@ export default function NewOrderScreen() {
               setQuick({
                 ...quick,
                 delivery: {
+                  placeId: result.placeId,
                   address: result.formattedAddress,
                   city: result.city,
                   state: result.state,
@@ -481,6 +483,7 @@ function RouteAddress(props: {
   value: string;
   onChange: (value: string) => void;
   onSelect: (address: {
+    placeId: string;
     formattedAddress: string;
     city: string;
     state: string;
