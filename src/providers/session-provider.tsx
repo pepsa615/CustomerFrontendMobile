@@ -8,7 +8,8 @@ import {
   type PropsWithChildren,
 } from 'react';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { apiRequest } from '@/api/client';
+import { AppState } from 'react-native';
+import { ApiError, apiRequest } from '@/api/client';
 import { secureSession } from '@/storage/secure-session';
 
 export type IdentityUser = {
@@ -36,6 +37,16 @@ type SessionContextValue = {
   setBiometricsEnabled: (enabled: boolean) => Promise<void>;
 };
 const SessionContext = createContext<SessionContextValue | null>(null);
+
+function refreshDelay(accessToken: string) {
+  try {
+    const part = accessToken.split('.')[1].replaceAll('-', '+').replaceAll('_', '/');
+    const payload = JSON.parse(globalThis.atob(part)) as { exp?: number };
+    return Math.max(15_000, (payload.exp ?? 0) * 1000 - Date.now() - 60_000);
+  } catch {
+    return 10 * 60 * 1000;
+  }
+}
 
 export function SessionProvider({ children }: PropsWithChildren) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -75,9 +86,33 @@ export function SessionProvider({ children }: PropsWithChildren) {
     secureSession
       .readBiometricEnabled()
       .then((enabled) => restore(enabled))
-      .catch(() => secureSession.clear())
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.status === 401)
+          return secureSession.clear();
+        return undefined;
+      })
       .finally(() => setRestoring(false));
   }, [restore]);
+  useEffect(() => {
+    if (!accessToken) return;
+    const renew = () => {
+      void restore(false).catch((error: unknown) => {
+        if (error instanceof ApiError && error.status === 401) {
+          void secureSession.clear();
+          setAccessToken(null);
+          setUser(null);
+        }
+      });
+    };
+    const timer = setTimeout(renew, refreshDelay(accessToken));
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && refreshDelay(accessToken) <= 15_000) renew();
+    });
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, [accessToken, restore]);
   const login = useCallback(
     async (identifier: string, password: string) => {
       const data = await apiRequest<SessionResponse>('/auth/login', undefined, {
